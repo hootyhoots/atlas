@@ -3,7 +3,7 @@ productName: Atlas
 directories:
   buildResources: build
 files:
-  - dist/**
+  - out/**
   - '!**/*.map'
 
 mac:
