@@ -7,3 +7,8 @@ export interface TabState {
   canGoBack: boolean
   canGoForward: boolean
 }
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}

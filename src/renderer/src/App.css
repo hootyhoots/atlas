@@ -29,13 +29,32 @@ html, body, #root {
   user-select: none;
 }
 
+/* ── App root ────────────────────────────────────── */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 /* ── Chrome wrapper ──────────────────────────────── */
 .chrome {
   display: flex;
   flex-direction: column;
   height: var(--chrome-h);
+  flex-shrink: 0;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+}
+
+/* ── Content area (below chrome) ─────────────────── */
+.content-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.web-spacer {
+  flex: 1;
 }
 
 /* ── Tab bar ─────────────────────────────────────── */
@@ -254,4 +273,209 @@ html, body, #root {
 .address-input:focus {
   text-align: left;
   cursor: text;
+}
+
+/* ── AI sidebar toggle button ────────────────────── */
+.ai-btn {
+  font-size: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.ai-btn--active {
+  color: var(--accent);
+  background: rgba(10, 132, 255, 0.15);
+}
+
+/* ── Sidebar ─────────────────────────────────────── */
+.sidebar {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.sidebar-close {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+
+.sidebar-close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.sidebar-quick-actions {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.quick-action-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.quick-action-btn:hover:not(:disabled) {
+  background: var(--bg-active);
+  border-color: var(--accent);
+}
+
+.quick-action-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sidebar-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-messages::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-messages::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+}
+
+.message--user {
+  align-items: flex-end;
+}
+
+.message--user .message-content {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 12px 12px 2px 12px;
+}
+
+.message--assistant .message-content {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-radius: 12px 12px 12px 2px;
+}
+
+.message-content {
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 90%;
+}
+
+.thinking {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.cursor {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.sidebar-input-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sidebar-input {
+  width: 100%;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 10px;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  line-height: 1.4;
+  transition: border-color 0.1s;
+}
+
+.sidebar-input:focus {
+  border-color: var(--accent);
+}
+
+.sidebar-input:disabled {
+  opacity: 0.6;
+}
+
+.sidebar-send {
+  align-self: flex-end;
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.sidebar-send:disabled {
+  opacity: 0.4;
+  cursor: default;
 }

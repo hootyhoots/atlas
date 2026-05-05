@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { TabState } from '../shared/types'
+import type { TabState, ChatMessage } from '../shared/types'
 
 export type TabsStateCallback = (tabs: TabState[], activeId: number | null) => void
 
@@ -23,5 +23,35 @@ contextBridge.exposeInMainWorld('browser', {
       return () =>
         ipcRenderer.removeListener('tabs:state', listener as Parameters<typeof ipcRenderer.on>[1])
     },
+  },
+
+  ai: {
+    chat: (messages: ChatMessage[], includePageContent: boolean): Promise<void> =>
+      ipcRenderer.invoke('ai:chat', messages, includePageContent),
+
+    onChunk: (cb: (text: string) => void): (() => void) => {
+      const listener = (_event: unknown, text: string) => cb(text)
+      ipcRenderer.on('ai:chunk', listener as Parameters<typeof ipcRenderer.on>[1])
+      return () =>
+        ipcRenderer.removeListener('ai:chunk', listener as Parameters<typeof ipcRenderer.on>[1])
+    },
+
+    onDone: (cb: () => void): (() => void) => {
+      const listener = () => cb()
+      ipcRenderer.on('ai:done', listener as Parameters<typeof ipcRenderer.on>[1])
+      return () =>
+        ipcRenderer.removeListener('ai:done', listener as Parameters<typeof ipcRenderer.on>[1])
+    },
+
+    onError: (cb: (message: string) => void): (() => void) => {
+      const listener = (_event: unknown, message: string) => cb(message)
+      ipcRenderer.on('ai:error', listener as Parameters<typeof ipcRenderer.on>[1])
+      return () =>
+        ipcRenderer.removeListener('ai:error', listener as Parameters<typeof ipcRenderer.on>[1])
+    },
+  },
+
+  sidebar: {
+    setWidth: (width: number): Promise<void> => ipcRenderer.invoke('sidebar:setWidth', width),
   },
 })

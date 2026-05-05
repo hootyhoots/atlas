@@ -9,6 +9,8 @@ interface Props {
   onBack: () => void
   onForward: () => void
   onReload: () => void
+  sidebarOpen: boolean
+  onToggleSidebar: () => void
 }
 
 function displayUrl(url: string): string {
@@ -29,6 +31,8 @@ export default function AddressBar({
   onBack,
   onForward,
   onReload,
+  sidebarOpen,
+  onToggleSidebar,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState('')
@@ -95,6 +99,14 @@ export default function AddressBar({
           spellCheck={false}
         />
       </div>
+      <button
+        className={`nav-btn ai-btn${sidebarOpen ? ' ai-btn--active' : ''}`}
+        onClick={onToggleSidebar}
+        aria-label="Toggle AI sidebar"
+        title="AI Assistant"
+      >
+        ✦
+      </button>
     </div>
   )
 }

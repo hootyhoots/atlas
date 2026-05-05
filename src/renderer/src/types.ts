@@ -1,5 +1,5 @@
-export type { TabState } from '../../shared/types'
-import type { TabState } from '../../shared/types'
+export type { TabState, ChatMessage } from '../../shared/types'
+import type { TabState, ChatMessage } from '../../shared/types'
 
 declare global {
   interface Window {
@@ -16,6 +16,15 @@ declare global {
         onStateChange: (
           cb: (tabs: TabState[], activeId: number | null) => void
         ) => () => void
+      }
+      ai: {
+        chat: (messages: ChatMessage[], includePageContent: boolean) => Promise<void>
+        onChunk: (cb: (text: string) => void) => () => void
+        onDone: (cb: () => void) => () => void
+        onError: (cb: (message: string) => void) => () => void
+      }
+      sidebar: {
+        setWidth: (width: number) => Promise<void>
       }
     }
   }

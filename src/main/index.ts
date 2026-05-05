@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { TabManager } from './tabs'
+import { streamChat } from './ai'
+import type { ChatMessage } from '../shared/types'
 
 function normalizeUrl(input: string): string {
   const trimmed = input.trim()
@@ -44,6 +46,30 @@ function createWindow() {
   ipcMain.handle('tabs:back', () => tabs.back())
   ipcMain.handle('tabs:forward', () => tabs.forward())
   ipcMain.handle('tabs:reload', () => tabs.reload())
+
+  ipcMain.handle('sidebar:setWidth', (_, width: number) => tabs.setSidebarWidth(width))
+
+  ipcMain.handle('ai:chat', async (event, messages: ChatMessage[], includePageContent: boolean) => {
+    let pageContent: string | null = null
+    if (includePageContent) {
+      const wc = tabs.getActiveWebContents()
+      if (wc) {
+        try {
+          pageContent = await wc.executeJavaScript('document.body.innerText.slice(0, 10000)')
+        } catch {
+          // page may not support JS execution
+        }
+      }
+    }
+    try {
+      await streamChat(messages, pageContent, (chunk) => {
+        event.sender.send('ai:chunk', chunk)
+      })
+      event.sender.send('ai:done')
+    } catch (err) {
+      event.sender.send('ai:error', err instanceof Error ? err.message : String(err))
+    }
+  })
 
   win.on('resize', () => tabs.updateActiveBounds())
 

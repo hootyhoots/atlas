@@ -15,6 +15,7 @@ export class TabManager {
   private nextId = 1
   private win: BrowserWindow
   private rendererReady = false
+  private sidebarWidth = 0
 
   constructor(win: BrowserWindow) {
     this.win = win
@@ -153,6 +154,15 @@ export class TabManager {
     if (tab) this.updateBounds(tab.view)
   }
 
+  setSidebarWidth(width: number) {
+    this.sidebarWidth = width
+    this.updateActiveBounds()
+  }
+
+  getActiveWebContents(): Electron.WebContents | null {
+    return this.activeTab?.view.webContents ?? null
+  }
+
   private get activeTab(): Tab | undefined {
     return this.activeId != null ? this.tabs.get(this.activeId) : undefined
   }
@@ -162,7 +172,7 @@ export class TabManager {
     view.setBounds({
       x: 0,
       y: CHROME_HEIGHT,
-      width,
+      width: Math.max(0, width - this.sidebarWidth),
       height: Math.max(0, height - CHROME_HEIGHT),
     })
   }
