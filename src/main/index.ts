@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { TabManager } from './tabs'
 import { streamChat } from './ai'
+import { loadSettings, getSettings, saveSettings } from './settings'
 import type { ChatMessage } from '../shared/types'
 
 function normalizeUrl(input: string): string {
@@ -49,6 +50,13 @@ function createWindow() {
 
   ipcMain.handle('sidebar:setWidth', (_, width: number) => tabs.setSidebarWidth(width))
 
+  ipcMain.handle('settings:get', () => ({
+    ...getSettings(),
+    hasEnvKey: !!process.env['ANTHROPIC_API_KEY'],
+  }))
+
+  ipcMain.handle('settings:save', (_, updates: { apiKey?: string }) => saveSettings(updates))
+
   ipcMain.handle('ai:chat', async (event, messages: ChatMessage[], includePageContent: boolean) => {
     let pageContent: string | null = null
     if (includePageContent) {
@@ -61,8 +69,9 @@ function createWindow() {
         }
       }
     }
+    const { apiKey } = getSettings()
     try {
-      await streamChat(messages, pageContent, (chunk) => {
+      await streamChat(messages, pageContent, apiKey || undefined, (chunk) => {
         event.sender.send('ai:chunk', chunk)
       })
       event.sender.send('ai:done')
@@ -88,6 +97,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  loadSettings()
   createWindow()
 
   app.on('activate', () => {

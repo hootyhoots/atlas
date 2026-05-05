@@ -4,7 +4,7 @@ import AddressBar from './components/AddressBar'
 import Sidebar from './components/Sidebar'
 import type { TabState } from './types'
 
-const SIDEBAR_WIDTH = 340
+const SIDEBAR_WIDTH = 360
 
 export default function App() {
   const [tabs, setTabs] = useState<TabState[]>([])

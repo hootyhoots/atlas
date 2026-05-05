@@ -7,15 +7,20 @@ const MAX_TOKENS = 2048
 const SYSTEM_TEXT = `You are an AI assistant built into Atlas, a web browser. You help users understand web content, answer questions, and assist with browsing tasks. Be concise and helpful. When you have access to page content, use it to give context-aware answers.`
 
 let client: Anthropic | null = null
+let activeKey: string | undefined = undefined
 
-function getClient(): Anthropic {
-  if (!client) client = new Anthropic()
+function getClient(apiKey?: string): Anthropic {
+  if (!client || apiKey !== activeKey) {
+    activeKey = apiKey
+    client = new Anthropic({ apiKey })
+  }
   return client
 }
 
 export async function streamChat(
   messages: ChatMessage[],
   pageContent: string | null,
+  apiKey: string | undefined,
   onChunk: (text: string) => void
 ): Promise<void> {
   const system: Anthropic.Messages.TextBlockParam[] = [
@@ -34,7 +39,7 @@ export async function streamChat(
     })
   }
 
-  const stream = getClient().messages.stream({
+  const stream = getClient(apiKey).messages.stream({
     model: MODEL,
     max_tokens: MAX_TOKENS,
     system,

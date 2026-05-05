@@ -26,6 +26,10 @@ declare global {
       sidebar: {
         setWidth: (width: number) => Promise<void>
       }
+      settings: {
+        get: () => Promise<{ apiKey?: string; hasEnvKey: boolean }>
+        save: (updates: { apiKey?: string }) => Promise<void>
+      }
     }
   }
 }

@@ -54,4 +54,11 @@ contextBridge.exposeInMainWorld('browser', {
   sidebar: {
     setWidth: (width: number): Promise<void> => ipcRenderer.invoke('sidebar:setWidth', width),
   },
+
+  settings: {
+    get: (): Promise<{ apiKey?: string; hasEnvKey: boolean }> =>
+      ipcRenderer.invoke('settings:get'),
+    save: (updates: { apiKey?: string }): Promise<void> =>
+      ipcRenderer.invoke('settings:save', updates),
+  },
 })
