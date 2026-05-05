@@ -1,0 +1,26 @@
+appId: com.atlas.browser
+productName: Atlas
+directories:
+  buildResources: build
+files:
+  - dist/**
+  - '!**/*.map'
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  category: public.app-category.productivity
+  darkModeSupport: true
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
