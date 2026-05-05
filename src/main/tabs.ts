@@ -1,16 +1,8 @@
 import { WebContentsView, BrowserWindow } from 'electron'
+import type { TabState } from '../shared/types'
 
+export type { TabState }
 export const CHROME_HEIGHT = 80
-
-export interface TabState {
-  id: number
-  title: string
-  url: string
-  favicon: string
-  isLoading: boolean
-  canGoBack: boolean
-  canGoForward: boolean
-}
 
 interface Tab {
   view: WebContentsView

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { TabState } from '../main/tabs'
+import type { TabState } from '../shared/types'
 
 export type TabsStateCallback = (tabs: TabState[], activeId: number | null) => void
 
@@ -17,10 +17,11 @@ contextBridge.exposeInMainWorld('browser', {
     reload: (): Promise<void> => ipcRenderer.invoke('tabs:reload'),
 
     onStateChange: (cb: TabsStateCallback): (() => void) => {
-      const listener = (_: Electron.IpcRendererEvent, tabs: TabState[], activeId: number | null) =>
+      const listener = (_event: unknown, tabs: TabState[], activeId: number | null) =>
         cb(tabs, activeId)
-      ipcRenderer.on('tabs:state', listener)
-      return () => ipcRenderer.removeListener('tabs:state', listener)
+      ipcRenderer.on('tabs:state', listener as Parameters<typeof ipcRenderer.on>[1])
+      return () =>
+        ipcRenderer.removeListener('tabs:state', listener as Parameters<typeof ipcRenderer.on>[1])
     },
   },
 })
