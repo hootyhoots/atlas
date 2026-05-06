@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { ChatMessage } from '../types'
+import AgentView from './AgentView'
 
 interface Props {
   onClose: () => void
 }
 
-type View = 'chat' | 'settings'
+type View = 'chat' | 'control' | 'settings'
 
 export default function Sidebar({ onClose }: Props) {
   const [view, setView] = useState<View>('chat')
@@ -117,6 +118,21 @@ export default function Sidebar({ onClose }: Props) {
         </div>
       </div>
 
+      {view !== 'settings' && (
+        <div className="sidebar-tabs">
+          <button
+            className={`sidebar-tab${view === 'chat' ? ' sidebar-tab--active' : ''}`}
+            onClick={() => setView('chat')}
+          >Chat</button>
+          <button
+            className={`sidebar-tab${view === 'control' ? ' sidebar-tab--active' : ''}`}
+            onClick={() => setView('control')}
+          >Control</button>
+        </div>
+      )}
+
+      {view === 'control' && <AgentView />}
+
       {view === 'settings' ? (
         <div className="settings-panel">
           <div className="settings-section">
@@ -176,7 +192,7 @@ export default function Sidebar({ onClose }: Props) {
             </p>
           </div>
         </div>
-      ) : (
+      ) : view === 'chat' ? (
         <>
           <div className="quick-actions">
             <button className="chip" onClick={() => sendMessage('Summarize this page for me.', true)} disabled={isStreaming}>
@@ -253,7 +269,7 @@ export default function Sidebar({ onClose }: Props) {
             <div className="input-hint">Enter to send · Shift+Enter for new line</div>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   )
 }

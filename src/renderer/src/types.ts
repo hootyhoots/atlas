@@ -1,6 +1,13 @@
 export type { TabState, ChatMessage } from '../../shared/types'
 import type { TabState, ChatMessage } from '../../shared/types'
 
+export type AgentEvent =
+  | { type: 'text'; text: string }
+  | { type: 'toolCall'; id: string; name: string; input: Record<string, unknown> }
+  | { type: 'toolResult'; id: string; name: string; ok: boolean; text?: string; imageData?: string }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
+
 declare global {
   interface Window {
     browser: {
@@ -36,6 +43,11 @@ declare global {
         onChunk: (cb: (text: string) => void) => () => void
         onDone: (cb: () => void) => () => void
         onError: (cb: (message: string) => void) => () => void
+      }
+      agent: {
+        run: (task: string) => Promise<void>
+        stop: () => Promise<void>
+        onEvent: (cb: (event: AgentEvent) => void) => () => void
       }
       sidebar: {
         setWidth: (width: number) => Promise<void>

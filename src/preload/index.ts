@@ -61,6 +61,13 @@ contextBridge.exposeInMainWorld('browser', {
       on('ai:error', (msg) => cb(msg as string)),
   },
 
+  agent: {
+    run: (task: string): Promise<void> => ipcRenderer.invoke('agent:run', task),
+    stop: (): Promise<void> => ipcRenderer.invoke('agent:stop'),
+    onEvent: (cb: (event: unknown) => void): (() => void) =>
+      on('agent:event', (evt) => cb(evt)),
+  },
+
   sidebar: {
     setWidth: (width: number): Promise<void> => ipcRenderer.invoke('sidebar:setWidth', width),
   },

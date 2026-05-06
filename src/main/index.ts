@@ -2,8 +2,10 @@ import { app, BrowserWindow, ipcMain, shell, Menu, net } from 'electron'
 import { join } from 'path'
 import { TabManager } from './tabs'
 import { streamChat } from './ai'
+import { runAgent, stopAgent } from './agent'
 import { loadSettings, getSettings, saveSettings } from './settings'
 import type { ChatMessage } from '../shared/types'
+import type { AgentEvent } from './agent'
 
 function normalizeUrl(input: string): string {
   const trimmed = input.trim()
@@ -221,6 +223,20 @@ function createWindow() {
       event.sender.send('ai:error', err instanceof Error ? err.message : String(err))
     }
   })
+
+  ipcMain.handle('agent:run', async (event, task: string) => {
+    const wc = tabs.getActiveWebContents()
+    if (!wc) {
+      event.sender.send('agent:event', { type: 'error', message: 'No active tab' } satisfies AgentEvent)
+      return
+    }
+    const { apiKey } = getSettings()
+    runAgent(task, wc, (url) => tabs.navigate(normalizeUrl(url)), apiKey || undefined, (evt: AgentEvent) => {
+      event.sender.send('agent:event', evt)
+    })
+  })
+
+  ipcMain.handle('agent:stop', () => stopAgent())
 
   win.on('resize', () => tabs.updateActiveBounds())
 
