@@ -2,11 +2,17 @@ import { WebContentsView, BrowserWindow } from 'electron'
 import type { TabState } from '../shared/types'
 
 export type { TabState }
-export const CHROME_HEIGHT = 82
+export let CHROME_HEIGHT = 82
 
 interface Tab {
   view: WebContentsView
   state: TabState
+}
+
+interface ClosedTab {
+  url: string
+  title: string
+  favicon: string
 }
 
 export class TabManager {
@@ -18,14 +24,16 @@ export class TabManager {
   private sidebarWidth = 0
   private extraTop = 0
   private partition?: string
-  private onPageLoadCb?: (id: number, url: string, title: string, wc: Electron.WebContents) => void
+  private bookmarkBarVisible = false
+  private onPageLoadCb?: (id: number, url: string, title: string, favicon: string, wc: Electron.WebContents) => void
+  private recentlyClosed: ClosedTab[] = []
 
   constructor(win: BrowserWindow, partition?: string) {
     this.win = win
     this.partition = partition
   }
 
-  setPageLoadCallback(cb: (id: number, url: string, title: string, wc: Electron.WebContents) => void) {
+  setPageLoadCallback(cb: (id: number, url: string, title: string, favicon: string, wc: Electron.WebContents) => void) {
     this.onPageLoadCb = cb
   }
 
@@ -59,6 +67,11 @@ export class TabManager {
       canGoForward: false,
       aiVisible: true,
       customTitle: undefined,
+      pinned: false,
+      locked: false,
+      muted: false,
+      audioPlaying: false,
+      isNewTab: true,
     }
 
     this.win.contentView.addChildView(view)
@@ -78,6 +91,7 @@ export class TabManager {
 
     wc.on('did-navigate', (_, navUrl) => {
       state.url = navUrl
+      state.isNewTab = false
       state.canGoBack = wc.canGoBack()
       state.canGoForward = wc.canGoForward()
       this.pushState()
@@ -85,6 +99,7 @@ export class TabManager {
 
     wc.on('did-navigate-in-page', (_, navUrl) => {
       state.url = navUrl
+      state.isNewTab = false
       state.canGoBack = wc.canGoBack()
       state.canGoForward = wc.canGoForward()
       this.pushState()
@@ -100,7 +115,7 @@ export class TabManager {
       state.canGoBack = wc.canGoBack()
       state.canGoForward = wc.canGoForward()
       this.pushState()
-      this.onPageLoadCb?.(id, state.url, state.title, wc)
+      this.onPageLoadCb?.(id, state.url, state.title, state.favicon, wc)
     })
 
     wc.on('found-in-page', (_, result) => {
@@ -109,6 +124,14 @@ export class TabManager {
         total: result.matches,
       })
     })
+
+    // Audio state detection
+    try {
+      (wc as Electron.WebContents & { on(event: 'audio-state-changed', listener: (event: Electron.Event, audible: boolean) => void): this }).on('audio-state-changed' as 'did-start-loading', () => {
+        state.audioPlaying = wc.isCurrentlyAudible()
+        this.pushState()
+      })
+    } catch {}
 
     view.setVisible(false)
     wc.loadURL(url)
@@ -119,6 +142,17 @@ export class TabManager {
   close(id: number) {
     const tab = this.tabs.get(id)
     if (!tab) return
+
+    // If locked, don't close
+    if (tab.state.locked) return
+
+    // Record in recently closed
+    this.recentlyClosed.push({
+      url: tab.state.url,
+      title: tab.state.customTitle ?? tab.state.title,
+      favicon: tab.state.favicon,
+    })
+    if (this.recentlyClosed.length > 20) this.recentlyClosed.shift()
 
     this.win.contentView.removeChildView(tab.view)
     tab.view.webContents.close()
@@ -217,8 +251,73 @@ export class TabManager {
     this.updateActiveBounds()
   }
 
+  setBookmarkBarVisible(visible: boolean) {
+    this.bookmarkBarVisible = visible
+    this.updateActiveBounds()
+  }
+
   getActiveWebContents(): Electron.WebContents | null {
     return this.activeTab?.view.webContents ?? null
+  }
+
+  pinTab(id: number, pinned: boolean) {
+    const tab = this.tabs.get(id)
+    if (!tab) return
+    tab.state.pinned = pinned
+    this.pushState()
+  }
+
+  lockTab(id: number, locked: boolean) {
+    const tab = this.tabs.get(id)
+    if (!tab) return
+    tab.state.locked = locked
+    this.pushState()
+  }
+
+  muteTab(id: number, muted: boolean) {
+    const tab = this.tabs.get(id)
+    if (!tab) return
+    tab.state.muted = muted
+    tab.view.webContents.setAudioMuted(muted)
+    this.pushState()
+  }
+
+  duplicateTab(id: number) {
+    const tab = this.tabs.get(id)
+    if (!tab) return
+    this.create(tab.state.url)
+  }
+
+  closeToRight(id: number) {
+    const ids = [...this.tabs.keys()]
+    const idx = ids.indexOf(id)
+    if (idx === -1) return
+    const toClose = ids.slice(idx + 1)
+    for (const cid of toClose) {
+      const tab = this.tabs.get(cid)
+      if (tab && !tab.state.locked) this.close(cid)
+    }
+  }
+
+  closeOthers(id: number) {
+    const ids = [...this.tabs.keys()]
+    for (const cid of ids) {
+      if (cid !== id) {
+        const tab = this.tabs.get(cid)
+        if (tab && !tab.state.locked) this.close(cid)
+      }
+    }
+  }
+
+  getRecentlyClosed(): ClosedTab[] {
+    return [...this.recentlyClosed].reverse()
+  }
+
+  reopenLastClosed() {
+    const last = this.recentlyClosed.pop()
+    if (last && last.url.startsWith('http')) {
+      this.create(last.url)
+    }
   }
 
   private get activeTab(): Tab | undefined {
@@ -227,7 +326,8 @@ export class TabManager {
 
   private updateBounds(view: WebContentsView) {
     const { width, height } = this.win.getContentBounds()
-    const top = CHROME_HEIGHT + this.extraTop
+    const bookmarkBarH = this.bookmarkBarVisible ? 32 : 0
+    const top = CHROME_HEIGHT + bookmarkBarH + this.extraTop
     view.setBounds({
       x: 0,
       y: top,
@@ -260,13 +360,14 @@ export class TabManager {
     this.pushState()
   }
 
-  getAllStates(): { id: number; title: string; url: string; favicon: string; customTitle?: string }[] {
+  getAllStates(): { id: number; title: string; url: string; favicon: string; customTitle?: string; pinned?: boolean }[] {
     return [...this.tabs.values()].map(t => ({
       id: t.state.id,
       title: t.state.title,
       url: t.state.url,
       favicon: t.state.favicon,
       customTitle: t.state.customTitle,
+      pinned: t.state.pinned,
     }))
   }
 

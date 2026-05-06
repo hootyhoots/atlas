@@ -8,6 +8,11 @@ export interface TabState {
   canGoForward: boolean
   aiVisible: boolean
   customTitle?: string
+  pinned?: boolean
+  locked?: boolean
+  muted?: boolean
+  audioPlaying?: boolean
+  isNewTab?: boolean
 }
 
 export interface ChatMessage {
