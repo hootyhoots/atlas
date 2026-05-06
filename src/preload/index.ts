@@ -88,4 +88,58 @@ contextBridge.exposeInMainWorld('browser', {
       ipcRenderer.invoke('memories:get'),
     clear: (): Promise<void> => ipcRenderer.invoke('memories:clear'),
   },
+
+  bookmarks: {
+    get: (): Promise<{ bookmarks: Array<{id: string; title: string; url: string; favicon?: string; folderId?: string; createdAt: number}>; folders: Array<{id: string; name: string; parentId?: string}> }> =>
+      ipcRenderer.invoke('bookmarks:get'),
+    add: (title: string, url: string, favicon?: string, folderId?: string): Promise<{id: string; title: string; url: string; favicon?: string; folderId?: string; createdAt: number}> =>
+      ipcRenderer.invoke('bookmarks:add', title, url, favicon, folderId),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke('bookmarks:remove', id),
+    isBookmarked: (url: string): Promise<boolean> => ipcRenderer.invoke('bookmarks:isBookmarked', url),
+    onToggle: (cb: () => void): (() => void) => on('bookmark:toggle', () => cb()),
+  },
+
+  history: {
+    get: (): Promise<Array<{url: string; title: string; favicon?: string; visitedAt: number}>> =>
+      ipcRenderer.invoke('history:get'),
+    search: (q: string): Promise<Array<{url: string; title: string; favicon?: string; visitedAt: number}>> =>
+      ipcRenderer.invoke('history:search', q),
+    delete: (visitedAt: number): Promise<void> => ipcRenderer.invoke('history:delete', visitedAt),
+    clear: (): Promise<void> => ipcRenderer.invoke('history:clear'),
+  },
+
+  downloads: {
+    open: (savePath: string): Promise<void> => ipcRenderer.invoke('downloads:open', savePath),
+    showInFolder: (savePath: string): Promise<void> => ipcRenderer.invoke('downloads:showInFolder', savePath),
+    onStart: (cb: (dl: {id: string; filename: string; url: string; totalBytes: number; receivedBytes: number; state: string; savePath: string}) => void): (() => void) =>
+      on('download:start', (dl) => cb(dl as {id: string; filename: string; url: string; totalBytes: number; receivedBytes: number; state: string; savePath: string})),
+    onProgress: (cb: (info: {id: string; state: string; receivedBytes: number; totalBytes: number}) => void): (() => void) =>
+      on('download:progress', (info) => cb(info as {id: string; state: string; receivedBytes: number; totalBytes: number})),
+    onDone: (cb: (info: {id: string; state: string; savePath: string}) => void): (() => void) =>
+      on('download:done', (info) => cb(info as {id: string; state: string; savePath: string})),
+    onToggle: (cb: () => void): (() => void) => on('downloads:toggle', () => cb()),
+  },
+
+  tabs_extra: {
+    pin: (id: number, pinned: boolean): Promise<void> => ipcRenderer.invoke('tabs:pin', id, pinned),
+    lock: (id: number, locked: boolean): Promise<void> => ipcRenderer.invoke('tabs:lock', id, locked),
+    mute: (id: number, muted: boolean): Promise<void> => ipcRenderer.invoke('tabs:mute', id, muted),
+    duplicate: (id: number): Promise<void> => ipcRenderer.invoke('tabs:duplicate', id),
+    closeToRight: (id: number): Promise<void> => ipcRenderer.invoke('tabs:closeToRight', id),
+    closeOthers: (id: number): Promise<void> => ipcRenderer.invoke('tabs:closeOthers', id),
+    reopenLast: (): Promise<void> => ipcRenderer.invoke('tabs:reopenLast'),
+    getRecentlyClosed: (): Promise<Array<{url: string; title: string; favicon: string}>> =>
+      ipcRenderer.invoke('tabs:getRecentlyClosed'),
+    showContextMenu: (id: number): Promise<void> => ipcRenderer.invoke('tabs:showContextMenu', id),
+    onStartRename: (cb: (id: number) => void): (() => void) =>
+      on('tab:startRename', (id) => cb(id as number)),
+  },
+
+  reader: {
+    toggle: (): Promise<void> => ipcRenderer.invoke('reader:toggle'),
+  },
+
+  bookmarkBar: {
+    setVisible: (visible: boolean): Promise<void> => ipcRenderer.invoke('bookmarkBar:setVisible', visible),
+  },
 })

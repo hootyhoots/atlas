@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 
 interface Settings {
   apiKey?: string
+  adBlockEnabled?: boolean
 }
 
 const settingsPath = join(app.getPath('userData'), 'atlas-settings.json')

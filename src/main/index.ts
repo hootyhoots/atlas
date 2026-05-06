@@ -1,10 +1,13 @@
 import { app, BrowserWindow, ipcMain, shell, Menu, net } from 'electron'
 import { join } from 'path'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { TabManager } from './tabs'
 import { streamChat } from './ai'
 import { runAgent, stopAgent } from './agent'
 import { loadSettings, getSettings, saveSettings } from './settings'
 import { loadMemories, addMemory, getMemories, clearMemories } from './memories'
+import { loadBookmarks, getBookmarks, addBookmark, removeBookmark, isBookmarked } from './bookmarks'
+import { loadHistory, addHistoryEntry, getHistory, searchHistory, deleteHistoryEntry, clearHistory } from './history'
 import type { ChatMessage } from '../shared/types'
 import type { AgentEvent } from './agent'
 
@@ -90,6 +93,12 @@ function buildMenu(win: BrowserWindow, tabs: TabManager) {
         },
         { type: 'separator' },
         {
+          label: 'Bookmark This Tab',
+          accelerator: 'CmdOrCtrl+D',
+          click: () => win.webContents.send('bookmark:toggle'),
+        },
+        { type: 'separator' },
+        {
           label: 'New Private Window',
           accelerator: 'CmdOrCtrl+Shift+N',
           click: () => createPrivateWindow(),
@@ -152,6 +161,40 @@ function buildMenu(win: BrowserWindow, tabs: TabManager) {
           click: () => win.webContents.send('tabs:search-toggle'),
         },
         { type: 'separator' },
+        {
+          label: 'Reader Mode',
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click: async () => {
+            const wc = tabs.getActiveWebContents()
+            if (!wc) return
+            const isReader: boolean = await wc.executeJavaScript('!!document.__readerActive').catch(() => false)
+            if (isReader) { wc.reload(); return }
+            wc.executeJavaScript(`
+              (async () => {
+                if (!window.Readability) {
+                  await new Promise((res, rej) => {
+                    const s = document.createElement('script')
+                    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Readability/0.5.0/Readability.min.js'
+                    s.onload = res; s.onerror = rej
+                    document.head.appendChild(s)
+                  })
+                }
+                const doc = document.cloneNode(true)
+                const article = new window.Readability(doc).parse()
+                if (!article) return
+                document.body.innerHTML = '<div style="max-width:720px;margin:40px auto;font-family:-apple-system,sans-serif;font-size:18px;line-height:1.7;color:#1a1a1a;padding:0 20px"><h1 style=\\"font-size:2em;margin-bottom:8px\\">' + article.title + '</h1><div style=\\"color:#888;margin-bottom:32px\\">' + (article.byline||'') + '</div>' + article.content + '</div>'
+                document.body.style.background = '#fafafa'
+                document.__readerActive = true
+              })()
+            `).catch(() => {})
+          },
+        },
+        {
+          label: 'Downloads',
+          accelerator: 'CmdOrCtrl+J',
+          click: () => win.webContents.send('downloads:toggle'),
+        },
+        { type: 'separator' },
         { role: 'toggleDevTools' as const },
       ],
     },
@@ -167,6 +210,12 @@ function buildMenu(win: BrowserWindow, tabs: TabManager) {
           label: 'Forward',
           accelerator: isMac ? 'Cmd+]' : 'Alt+Right',
           click: () => tabs.forward(),
+        },
+        { type: 'separator' },
+        {
+          label: 'Reopen Last Closed Tab',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click: () => tabs.reopenLastClosed(),
         },
       ],
     },
@@ -192,8 +241,30 @@ function buildMenu(win: BrowserWindow, tabs: TabManager) {
   if (!isMac) win.setMenuBarVisibility(false)
 }
 
+const BLOCK_LIST = [
+  'doubleclick.net', 'googlesyndication.com', 'googleadservices.com',
+  'ads.yahoo.com', 'adsystem.amazon.com', 'facebook.com/tr',
+  'connect.facebook.net', 'analytics.google.com', 'google-analytics.com',
+  'googletagmanager.com', 'hotjar.com', 'mixpanel.com', 'segment.com',
+  'scorecardresearch.com', 'quantserve.com', 'adnxs.com', 'rubiconproject.com',
+  'openx.net', 'pubmatic.com', 'criteo.com', 'outbrain.com', 'taboola.com',
+  'amazon-adsystem.com', 'moatads.com', 'advertising.com', 'casalemedia.com',
+]
+
 function createWindow() {
   const isMac = process.platform === 'darwin'
+
+  // Session restore
+  const sessionFile = join(app.getPath('userData'), 'atlas-session.json')
+  let restoredUrls: string[] = []
+  try {
+    if (existsSync(sessionFile)) {
+      const sessionData = JSON.parse(readFileSync(sessionFile, 'utf-8'))
+      restoredUrls = sessionData
+        .map((s: { url: string }) => s.url)
+        .filter((u: string) => u && u.startsWith('http'))
+    }
+  } catch {}
 
   const win = new BrowserWindow({
     width: 1280,
@@ -262,12 +333,14 @@ function createWindow() {
 
   ipcMain.handle('settings:save', (_, updates: { apiKey?: string }) => saveSettings(updates))
 
-  tabs.setPageLoadCallback(async (id, url, title, wc) => {
-    if (!tabs.getAiVisible(id)) return
-    try {
-      const snippet: string = await wc.executeJavaScript('document.body?.innerText?.slice(0,400)??""')
-      addMemory(url, title, snippet)
-    } catch {}
+  tabs.setPageLoadCallback(async (id, url, title, favicon, wc) => {
+    addHistoryEntry(url, title, favicon)
+    if (tabs.getAiVisible(id)) {
+      try {
+        const snippet: string = await wc.executeJavaScript('document.body?.innerText?.slice(0,400)??""')
+        addMemory(url, title, snippet)
+      } catch {}
+    }
   })
 
   ipcMain.handle('ai:chat', async (event, messages: ChatMessage[], includePageContent: boolean) => {
@@ -305,6 +378,152 @@ function createWindow() {
 
   ipcMain.handle('agent:stop', () => stopAgent())
 
+  // Bookmarks IPC
+  ipcMain.handle('bookmarks:get', () => getBookmarks())
+  ipcMain.handle('bookmarks:add', (_, title: string, url: string, favicon?: string, folderId?: string) =>
+    addBookmark({ title, url, favicon, folderId }))
+  ipcMain.handle('bookmarks:remove', (_, id: string) => removeBookmark(id))
+  ipcMain.handle('bookmarks:isBookmarked', (_, url: string) => isBookmarked(url))
+
+  // History IPC
+  ipcMain.handle('history:get', () => getHistory())
+  ipcMain.handle('history:search', (_, q: string) => searchHistory(q))
+  ipcMain.handle('history:delete', (_, visitedAt: number) => deleteHistoryEntry(visitedAt))
+  ipcMain.handle('history:clear', () => clearHistory())
+
+  // Downloads IPC
+  ipcMain.handle('downloads:open', (_, savePath: string) => shell.openPath(savePath))
+  ipcMain.handle('downloads:showInFolder', (_, savePath: string) => shell.showItemInFolder(savePath))
+
+  // Tab operations IPC
+  ipcMain.handle('tabs:pin', (_, id: number, pinned: boolean) => tabs.pinTab(id, pinned))
+  ipcMain.handle('tabs:lock', (_, id: number, locked: boolean) => tabs.lockTab(id, locked))
+  ipcMain.handle('tabs:mute', (_, id: number, muted: boolean) => tabs.muteTab(id, muted))
+  ipcMain.handle('tabs:duplicate', (_, id: number) => tabs.duplicateTab(id))
+  ipcMain.handle('tabs:closeToRight', (_, id: number) => tabs.closeToRight(id))
+  ipcMain.handle('tabs:closeOthers', (_, id: number) => tabs.closeOthers(id))
+  ipcMain.handle('tabs:reopenLast', () => tabs.reopenLastClosed())
+  ipcMain.handle('tabs:getRecentlyClosed', () => tabs.getRecentlyClosed())
+
+  // Tab context menu
+  ipcMain.handle('tabs:showContextMenu', (_, id: number) => {
+    const allStates = tabs.getAllStates()
+    const tab = allStates.find(t => t.id === id)
+    if (!tab) return
+    const menu = Menu.buildFromTemplate([
+      {
+        label: tab.pinned ? 'Unpin Tab' : 'Pin Tab',
+        click: () => tabs.pinTab(id, !tab.pinned),
+      },
+      {
+        label: tab.locked ? 'Unlock Tab' : 'Lock Tab',
+        click: () => tabs.lockTab(id, !tab.locked),
+      },
+      {
+        label: tab.muted ? 'Unmute Tab' : 'Mute Tab',
+        click: () => tabs.muteTab(id, !tab.muted),
+      },
+      { type: 'separator' },
+      {
+        label: 'Duplicate Tab',
+        click: () => tabs.duplicateTab(id),
+      },
+      {
+        label: 'Close Tabs to the Right',
+        click: () => tabs.closeToRight(id),
+      },
+      {
+        label: 'Close Other Tabs',
+        click: () => tabs.closeOthers(id),
+      },
+      { type: 'separator' },
+      {
+        label: 'Rename Tab',
+        click: () => win.webContents.send('tab:startRename', id),
+      },
+    ])
+    menu.popup({ window: win })
+  })
+
+  // Reader mode IPC
+  ipcMain.handle('reader:toggle', async () => {
+    const wc = tabs.getActiveWebContents()
+    if (!wc) return
+    const isReader: boolean = await wc.executeJavaScript('!!document.__readerActive').catch(() => false)
+    if (isReader) {
+      wc.reload()
+      return
+    }
+    await wc.executeJavaScript(`
+      (async () => {
+        if (!window.Readability) {
+          await new Promise((res, rej) => {
+            const s = document.createElement('script')
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Readability/0.5.0/Readability.min.js'
+            s.onload = res; s.onerror = rej
+            document.head.appendChild(s)
+          })
+        }
+        const doc = document.cloneNode(true)
+        const article = new window.Readability(doc).parse()
+        if (!article) return
+        document.body.innerHTML = '<div style="max-width:720px;margin:40px auto;font-family:-apple-system,sans-serif;font-size:18px;line-height:1.7;color:#1a1a1a;padding:0 20px"><h1 style=\\"font-size:2em;margin-bottom:8px\\">' + article.title + '</h1><div style=\\"color:#888;margin-bottom:32px\\">' + (article.byline||'') + '</div>' + article.content + '</div>'
+        document.body.style.background = '#fafafa'
+        document.__readerActive = true
+      })()
+    `).catch(() => {})
+  })
+
+  // Bookmark bar visibility
+  ipcMain.handle('bookmarkBar:setVisible', (_, visible: boolean) => tabs.setBookmarkBarVisible(visible))
+
+  // Setup ad blocker
+  win.webContents.session.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
+    const settings = getSettings()
+    if (settings.adBlockEnabled === false) {
+      callback({ cancel: false })
+      return
+    }
+    const url = details.url
+    const blocked = BLOCK_LIST.some(domain => url.includes(domain))
+    callback({ cancel: blocked })
+  })
+
+  // Setup download manager
+  win.webContents.session.on('will-download', (_event, item) => {
+    const id = `dl_${Date.now()}`
+    const dl = {
+      id,
+      filename: item.getFilename(),
+      url: item.getURL(),
+      totalBytes: item.getTotalBytes(),
+      receivedBytes: 0,
+      state: 'progressing' as const,
+      savePath: '',
+    }
+    win.webContents.send('download:start', dl)
+
+    item.on('updated', (__, state) => {
+      win.webContents.send('download:progress', {
+        id,
+        state,
+        receivedBytes: item.getReceivedBytes(),
+        totalBytes: item.getTotalBytes(),
+      })
+    })
+
+    item.once('done', (__, state) => {
+      win.webContents.send('download:done', { id, state, savePath: item.getSavePath() })
+    })
+  })
+
+  // Session save on quit
+  app.on('before-quit', () => {
+    const allTabs = tabs.getAllStates()
+    const sessionData = allTabs.map(t => ({ url: t.url, pinned: t.pinned }))
+    try { writeFileSync(sessionFile, JSON.stringify(sessionData), 'utf-8') } catch {}
+  })
+
   win.on('resize', () => tabs.updateActiveBounds())
 
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -318,12 +537,19 @@ function createWindow() {
     return { action: 'deny' }
   })
 
-  tabs.create()
+  // Restore session or create default tab
+  if (restoredUrls.length > 0) {
+    restoredUrls.forEach(url => tabs.create(url))
+  } else {
+    tabs.create()
+  }
 }
 
 app.whenReady().then(() => {
   loadSettings()
   loadMemories()
+  loadBookmarks()
+  loadHistory()
   createWindow()
 
   app.on('activate', () => {

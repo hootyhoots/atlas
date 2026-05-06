@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { ChatMessage } from '../types'
 import AgentView from './AgentView'
+import BookmarksView from './BookmarksView'
+import HistoryView from './HistoryView'
 
 interface Props {
   onClose: () => void
 }
 
-type View = 'chat' | 'control' | 'settings'
+type View = 'chat' | 'control' | 'bookmarks' | 'history' | 'settings'
 
 export default function Sidebar({ onClose }: Props) {
   const [view, setView] = useState<View>('chat')
@@ -128,10 +130,20 @@ export default function Sidebar({ onClose }: Props) {
             className={`sidebar-tab${view === 'control' ? ' sidebar-tab--active' : ''}`}
             onClick={() => setView('control')}
           >Control</button>
+          <button
+            className={`sidebar-tab${view === 'bookmarks' ? ' sidebar-tab--active' : ''}`}
+            onClick={() => setView('bookmarks')}
+          >Bookmarks</button>
+          <button
+            className={`sidebar-tab${view === 'history' ? ' sidebar-tab--active' : ''}`}
+            onClick={() => setView('history')}
+          >History</button>
         </div>
       )}
 
       {view === 'control' && <AgentView />}
+      {view === 'bookmarks' && <BookmarksView />}
+      {view === 'history' && <HistoryView />}
 
       {view === 'settings' ? (
         <div className="settings-panel">

@@ -4,7 +4,10 @@ import AddressBar, { type AddressBarHandle } from './components/AddressBar'
 import Sidebar from './components/Sidebar'
 import FindBar from './components/FindBar'
 import TabSearch from './components/TabSearch'
-import type { TabState } from './types'
+import BookmarkBar from './components/BookmarkBar'
+import DownloadsBar from './components/DownloadsBar'
+import NewTabPage from './components/NewTabPage'
+import type { TabState, Bookmark } from './types'
 
 const SIDEBAR_WIDTH = 360
 const FIND_BAR_HEIGHT = 46
@@ -20,6 +23,9 @@ export default function App() {
   const [findOpen, setFindOpen] = useState(false)
   const [findResult, setFindResult] = useState<{ active: number; total: number } | null>(null)
   const [tabSearchOpen, setTabSearchOpen] = useState(false)
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
+  const [bookmarkBarVisible, setBookmarkBarVisible] = useState(false)
+  const [downloadsOpen, setDownloadsOpen] = useState(false)
   const addressBarRef = useRef<AddressBarHandle>(null)
 
   // Keep browser and find state in refs to avoid stale closures
@@ -64,11 +70,53 @@ export default function App() {
     return window.browser.tabs.onSearchToggle(() => setTabSearchOpen(t => !t))
   }, [])
 
+  // Load bookmarks
+  useEffect(() => {
+    window.browser.bookmarks.get().then(data => {
+      setBookmarks(data.bookmarks)
+      const hasBookmarks = data.bookmarks.length > 0
+      setBookmarkBarVisible(hasBookmarks)
+      window.browser.bookmarkBar.setVisible(hasBookmarks)
+    })
+  }, [])
+
+  // Bookmark toggle (Cmd+D)
+  useEffect(() => {
+    return window.browser.bookmarks.onToggle(async () => {
+      const active = tabs.find(t => t.id === activeId)
+      if (!active || !active.url.startsWith('http')) return
+      const already = await window.browser.bookmarks.isBookmarked(active.url)
+      if (already) {
+        // find and remove
+        const data = await window.browser.bookmarks.get()
+        const bk = data.bookmarks.find(b => b.url === active.url)
+        if (bk) {
+          await window.browser.bookmarks.remove(bk.id)
+        }
+      } else {
+        await window.browser.bookmarks.add(active.title || active.url, active.url, active.favicon)
+      }
+      const data = await window.browser.bookmarks.get()
+      setBookmarks(data.bookmarks)
+      const hasBookmarks = data.bookmarks.length > 0
+      setBookmarkBarVisible(hasBookmarks)
+      window.browser.bookmarkBar.setVisible(hasBookmarks)
+    })
+  }, [tabs, activeId])
+
+  // Downloads toggle (Cmd+J)
+  useEffect(() => {
+    return window.browser.downloads.onToggle(() => setDownloadsOpen(o => !o))
+  }, [])
+
   // extraTop: space between chrome and webContentsView for panels
+  const DOWNLOADS_HEIGHT = downloadsOpen ? 200 : 0
   const extraTop = findOpen
     ? FIND_BAR_HEIGHT
     : tabSearchOpen
     ? TAB_SEARCH_HEIGHT
+    : downloadsOpen
+    ? DOWNLOADS_HEIGHT
     : suggestions.length > 0
     ? suggestions.length * SUGGESTION_ITEM_HEIGHT
     : 0
@@ -140,6 +188,7 @@ export default function App() {
           onClose={id => window.browser.tabs.close(id)}
           onNew={() => window.browser.tabs.create()}
           onRename={handleRename}
+          onContextMenu={id => window.browser.tabs_extra.showContextMenu(id)}
         />
         <AddressBar
           ref={addressBarRef}
@@ -157,10 +206,24 @@ export default function App() {
           aiVisible={active?.aiVisible ?? true}
           onToggleAiVisible={handleToggleAiVisible}
         />
+        {bookmarkBarVisible && (
+          <BookmarkBar
+            bookmarks={bookmarks}
+            onNavigate={url => window.browser.tabs.navigate(url)}
+            onRemove={async id => {
+              await window.browser.bookmarks.remove(id)
+              const data = await window.browser.bookmarks.get()
+              setBookmarks(data.bookmarks)
+              const hasBookmarks = data.bookmarks.length > 0
+              setBookmarkBarVisible(hasBookmarks)
+              window.browser.bookmarkBar.setVisible(hasBookmarks)
+            }}
+          />
+        )}
       </div>
 
       {/* Panels that sit between chrome and web content */}
-      {suggestions.length > 0 && !findOpen && !tabSearchOpen && (
+      {suggestions.length > 0 && !findOpen && !tabSearchOpen && !downloadsOpen && (
         <div className="suggestions-panel">
           {suggestions.map((s, i) => (
             <button
@@ -194,8 +257,19 @@ export default function App() {
         />
       )}
 
+      {downloadsOpen && (
+        <DownloadsBar />
+      )}
+
       <div className="content-area">
-        <div className="web-spacer" />
+        {active?.isNewTab ? (
+          <NewTabPage
+            onNavigate={url => window.browser.tabs.navigate(url)}
+            onFocusAddressBar={() => addressBarRef.current?.focus()}
+          />
+        ) : (
+          <div className="web-spacer" />
+        )}
         {sidebarOpen && <Sidebar onClose={() => setSidebarOpen(false)} />}
       </div>
     </div>

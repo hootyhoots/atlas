@@ -64,6 +64,77 @@ declare global {
         get: () => Promise<Array<{url: string; title: string; snippet: string; timestamp: number}>>
         clear: () => Promise<void>
       }
+      bookmarks: {
+        get: () => Promise<{ bookmarks: Bookmark[]; folders: BookmarkFolder[] }>
+        add: (title: string, url: string, favicon?: string, folderId?: string) => Promise<Bookmark>
+        remove: (id: string) => Promise<void>
+        isBookmarked: (url: string) => Promise<boolean>
+        onToggle: (cb: () => void) => () => void
+      }
+      history: {
+        get: () => Promise<HistoryEntry[]>
+        search: (q: string) => Promise<HistoryEntry[]>
+        delete: (visitedAt: number) => Promise<void>
+        clear: () => Promise<void>
+      }
+      downloads: {
+        open: (savePath: string) => Promise<void>
+        showInFolder: (savePath: string) => Promise<void>
+        onStart: (cb: (dl: Download) => void) => () => void
+        onProgress: (cb: (info: {id: string; state: string; receivedBytes: number; totalBytes: number}) => void) => () => void
+        onDone: (cb: (info: {id: string; state: string; savePath: string}) => void) => () => void
+        onToggle: (cb: () => void) => () => void
+      }
+      tabs_extra: {
+        pin: (id: number, pinned: boolean) => Promise<void>
+        lock: (id: number, locked: boolean) => Promise<void>
+        mute: (id: number, muted: boolean) => Promise<void>
+        duplicate: (id: number) => Promise<void>
+        closeToRight: (id: number) => Promise<void>
+        closeOthers: (id: number) => Promise<void>
+        reopenLast: () => Promise<void>
+        getRecentlyClosed: () => Promise<Array<{url: string; title: string; favicon: string}>>
+        showContextMenu: (id: number) => Promise<void>
+        onStartRename: (cb: (id: number) => void) => () => void
+      }
+      reader: {
+        toggle: () => Promise<void>
+      }
+      bookmarkBar: {
+        setVisible: (visible: boolean) => Promise<void>
+      }
     }
   }
+}
+
+export interface Bookmark {
+  id: string
+  title: string
+  url: string
+  favicon?: string
+  folderId?: string
+  createdAt: number
+}
+
+export interface BookmarkFolder {
+  id: string
+  name: string
+  parentId?: string
+}
+
+export interface HistoryEntry {
+  url: string
+  title: string
+  favicon?: string
+  visitedAt: number
+}
+
+export interface Download {
+  id: string
+  filename: string
+  url: string
+  totalBytes: number
+  receivedBytes: number
+  state: string
+  savePath: string
 }
