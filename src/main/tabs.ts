@@ -46,7 +46,7 @@ export class TabManager {
     this.pushState()
   }
 
-  create(url = 'https://www.google.com'): number {
+  create(url?: string): number {
     const id = this.nextId++
     const view = new WebContentsView({
       webPreferences: {
@@ -57,12 +57,15 @@ export class TabManager {
       }
     })
 
+    const isNewTab = !url
+    const loadUrl = url ?? 'about:blank'
+
     const state: TabState = {
       id,
       title: 'New Tab',
-      url,
+      url: loadUrl,
       favicon: '',
-      isLoading: true,
+      isLoading: !isNewTab,
       canGoBack: false,
       canGoForward: false,
       aiVisible: true,
@@ -71,7 +74,7 @@ export class TabManager {
       locked: false,
       muted: false,
       audioPlaying: false,
-      isNewTab: true,
+      isNewTab,
     }
 
     this.win.contentView.addChildView(view)
@@ -91,7 +94,7 @@ export class TabManager {
 
     wc.on('did-navigate', (_, navUrl) => {
       state.url = navUrl
-      state.isNewTab = false
+      if (navUrl !== 'about:blank') state.isNewTab = false
       state.canGoBack = wc.canGoBack()
       state.canGoForward = wc.canGoForward()
       this.pushState()
@@ -99,14 +102,14 @@ export class TabManager {
 
     wc.on('did-navigate-in-page', (_, navUrl) => {
       state.url = navUrl
-      state.isNewTab = false
+      if (navUrl !== 'about:blank') state.isNewTab = false
       state.canGoBack = wc.canGoBack()
       state.canGoForward = wc.canGoForward()
       this.pushState()
     })
 
     wc.on('did-start-loading', () => {
-      state.isLoading = true
+      if (!state.isNewTab) state.isLoading = true
       this.pushState()
     })
 
@@ -134,7 +137,7 @@ export class TabManager {
     } catch {}
 
     view.setVisible(false)
-    wc.loadURL(url)
+    if (!isNewTab) wc.loadURL(loadUrl)
     this.switchTo(id)
     return id
   }
