@@ -6,6 +6,8 @@ export interface TabState {
   isLoading: boolean
   canGoBack: boolean
   canGoForward: boolean
+  aiVisible: boolean
+  customTitle?: string
 }
 
 export interface ChatMessage {

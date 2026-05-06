@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('browser', {
     reload: (): Promise<void> => ipcRenderer.invoke('tabs:reload'),
     onStateChange: (cb: TabsStateCallback): (() => void) =>
       on('tabs:state', (tabs, activeId) => cb(tabs as TabState[], activeId as number | null)),
+    setAiVisible: (id: number, visible: boolean): Promise<void> => ipcRenderer.invoke('tabs:setAiVisible', id, visible),
+    rename: (id: number, title: string | undefined): Promise<void> => ipcRenderer.invoke('tabs:rename', id, title),
+    getAll: (): Promise<TabState[]> => ipcRenderer.invoke('tabs:getAll'),
+    onSearchToggle: (cb: () => void): (() => void) => on('tabs:search-toggle', () => cb()),
   },
 
   view: {
@@ -77,5 +81,11 @@ contextBridge.exposeInMainWorld('browser', {
       ipcRenderer.invoke('settings:get'),
     save: (updates: { apiKey?: string }): Promise<void> =>
       ipcRenderer.invoke('settings:save', updates),
+  },
+
+  memories: {
+    get: (): Promise<Array<{url: string; title: string; snippet: string; timestamp: number}>> =>
+      ipcRenderer.invoke('memories:get'),
+    clear: (): Promise<void> => ipcRenderer.invoke('memories:clear'),
   },
 })

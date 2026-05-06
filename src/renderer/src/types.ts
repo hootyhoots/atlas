@@ -21,6 +21,10 @@ declare global {
         forward: () => Promise<void>
         reload: () => Promise<void>
         onStateChange: (cb: (tabs: TabState[], activeId: number | null) => void) => () => void
+        setAiVisible: (id: number, visible: boolean) => Promise<void>
+        rename: (id: number, title: string | undefined) => Promise<void>
+        getAll: () => Promise<TabState[]>
+        onSearchToggle: (cb: () => void) => () => void
       }
       view: {
         setExtraTop: (height: number) => Promise<void>
@@ -55,6 +59,10 @@ declare global {
       settings: {
         get: () => Promise<{ apiKey?: string; hasEnvKey: boolean }>
         save: (updates: { apiKey?: string }) => Promise<void>
+      }
+      memories: {
+        get: () => Promise<Array<{url: string; title: string; snippet: string; timestamp: number}>>
+        clear: () => Promise<void>
       }
     }
   }

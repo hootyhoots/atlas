@@ -17,10 +17,18 @@ function getClient(apiKey?: string): Anthropic {
   return client
 }
 
+interface Memory {
+  url: string
+  title: string
+  snippet: string
+  timestamp: number
+}
+
 export async function streamChat(
   messages: ChatMessage[],
   pageContent: string | null,
   apiKey: string | undefined,
+  memories: Memory[],
   onChunk: (text: string) => void
 ): Promise<void> {
   const system: Anthropic.Messages.TextBlockParam[] = [
@@ -30,6 +38,17 @@ export async function streamChat(
       cache_control: { type: 'ephemeral' },
     },
   ]
+
+  if (memories.length > 0) {
+    const top10 = memories.slice(0, 10)
+    const memText = 'Recent pages you\'ve visited (browser memory):\n' +
+      top10.map(m => `- ${m.title} (${m.url}): ${m.snippet}`).join('\n')
+    system.push({
+      type: 'text',
+      text: memText,
+      cache_control: { type: 'ephemeral' },
+    })
+  }
 
   if (pageContent) {
     system.push({

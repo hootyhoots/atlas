@@ -4,6 +4,7 @@ import { TabManager } from './tabs'
 import { streamChat } from './ai'
 import { runAgent, stopAgent } from './agent'
 import { loadSettings, getSettings, saveSettings } from './settings'
+import { loadMemories, addMemory, getMemories, clearMemories } from './memories'
 import type { ChatMessage } from '../shared/types'
 import type { AgentEvent } from './agent'
 
@@ -14,6 +15,47 @@ function normalizeUrl(input: string): string {
     return `https://${trimmed}`
   }
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`
+}
+
+function createPrivateWindow() {
+  const isMac = process.platform === 'darwin'
+
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 600,
+    minHeight: 400,
+    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
+    ...(isMac && { trafficLightPosition: { x: 16, y: 20 } }),
+    backgroundColor: '#1a0a2e',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    }
+  })
+
+  const tabs = new TabManager(win, 'incognito')
+
+  win.on('resize', () => tabs.updateActiveBounds())
+
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  } else {
+    win.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  // After the renderer is ready, send private flag and init tabs
+  win.webContents.once('did-finish-load', () => {
+    win.webContents.send('window:isPrivate', true)
+    tabs.create()
+  })
 }
 
 function buildMenu(win: BrowserWindow, tabs: TabManager) {
@@ -45,6 +87,12 @@ function buildMenu(win: BrowserWindow, tabs: TabManager) {
           label: 'Close Tab',
           accelerator: 'CmdOrCtrl+W',
           click: () => { if (tabs.activeTabId != null) tabs.close(tabs.activeTabId) },
+        },
+        { type: 'separator' },
+        {
+          label: 'New Private Window',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => createPrivateWindow(),
         },
         { type: 'separator' },
         isMac ? { role: 'close' as const } : { role: 'quit' as const },
@@ -96,6 +144,12 @@ function buildMenu(win: BrowserWindow, tabs: TabManager) {
           label: 'Reset Zoom',
           accelerator: 'CmdOrCtrl+0',
           click: () => tabs.resetZoom(),
+        },
+        { type: 'separator' },
+        {
+          label: 'Search Tabs',
+          accelerator: 'CmdOrCtrl+Shift+A',
+          click: () => win.webContents.send('tabs:search-toggle'),
         },
         { type: 'separator' },
         { role: 'toggleDevTools' as const },
@@ -173,6 +227,11 @@ function createWindow() {
   ipcMain.handle('tabs:back', () => tabs.back())
   ipcMain.handle('tabs:forward', () => tabs.forward())
   ipcMain.handle('tabs:reload', () => tabs.reload())
+  ipcMain.handle('tabs:setAiVisible', (_, id: number, visible: boolean) => tabs.setAiVisible(id, visible))
+  ipcMain.handle('tabs:rename', (_, id: number, title: string | undefined) => tabs.renameTab(id, title))
+  ipcMain.handle('tabs:getAll', () => tabs.getAllStates())
+  ipcMain.handle('memories:get', () => getMemories())
+  ipcMain.handle('memories:clear', () => clearMemories())
 
   ipcMain.handle('sidebar:setWidth', (_, width: number) => tabs.setSidebarWidth(width))
   ipcMain.handle('view:setExtraTop', (_, height: number) => tabs.setExtraTop(height))
@@ -203,6 +262,14 @@ function createWindow() {
 
   ipcMain.handle('settings:save', (_, updates: { apiKey?: string }) => saveSettings(updates))
 
+  tabs.setPageLoadCallback(async (id, url, title, wc) => {
+    if (!tabs.getAiVisible(id)) return
+    try {
+      const snippet: string = await wc.executeJavaScript('document.body?.innerText?.slice(0,400)??""')
+      addMemory(url, title, snippet)
+    } catch {}
+  })
+
   ipcMain.handle('ai:chat', async (event, messages: ChatMessage[], includePageContent: boolean) => {
     let pageContent: string | null = null
     if (includePageContent) {
@@ -215,7 +282,7 @@ function createWindow() {
     }
     const { apiKey } = getSettings()
     try {
-      await streamChat(messages, pageContent, apiKey || undefined, (chunk) => {
+      await streamChat(messages, pageContent, apiKey || undefined, getMemories(), (chunk) => {
         event.sender.send('ai:chunk', chunk)
       })
       event.sender.send('ai:done')
@@ -256,6 +323,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   loadSettings()
+  loadMemories()
   createWindow()
 
   app.on('activate', () => {

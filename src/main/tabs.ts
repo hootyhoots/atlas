@@ -17,9 +17,16 @@ export class TabManager {
   private rendererReady = false
   private sidebarWidth = 0
   private extraTop = 0
+  private partition?: string
+  private onPageLoadCb?: (id: number, url: string, title: string, wc: Electron.WebContents) => void
 
-  constructor(win: BrowserWindow) {
+  constructor(win: BrowserWindow, partition?: string) {
     this.win = win
+    this.partition = partition
+  }
+
+  setPageLoadCallback(cb: (id: number, url: string, title: string, wc: Electron.WebContents) => void) {
+    this.onPageLoadCb = cb
   }
 
   get activeTabId(): number | null {
@@ -38,6 +45,7 @@ export class TabManager {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
+        ...(this.partition ? { partition: this.partition } : {}),
       }
     })
 
@@ -49,6 +57,8 @@ export class TabManager {
       isLoading: true,
       canGoBack: false,
       canGoForward: false,
+      aiVisible: true,
+      customTitle: undefined,
     }
 
     this.win.contentView.addChildView(view)
@@ -90,6 +100,7 @@ export class TabManager {
       state.canGoBack = wc.canGoBack()
       state.canGoForward = wc.canGoForward()
       this.pushState()
+      this.onPageLoadCb?.(id, state.url, state.title, wc)
     })
 
     wc.on('found-in-page', (_, result) => {
@@ -229,6 +240,34 @@ export class TabManager {
     if (!this.rendererReady) return
     const tabs = [...this.tabs.values()].map(t => t.state)
     this.win.webContents.send('tabs:state', tabs, this.activeId)
+  }
+
+  setAiVisible(id: number, visible: boolean) {
+    const tab = this.tabs.get(id)
+    if (!tab) return
+    tab.state.aiVisible = visible
+    this.pushState()
+  }
+
+  getAiVisible(id: number): boolean {
+    return this.tabs.get(id)?.state.aiVisible ?? true
+  }
+
+  renameTab(id: number, title: string | undefined) {
+    const tab = this.tabs.get(id)
+    if (!tab) return
+    tab.state.customTitle = title
+    this.pushState()
+  }
+
+  getAllStates(): { id: number; title: string; url: string; favicon: string; customTitle?: string }[] {
+    return [...this.tabs.values()].map(t => ({
+      id: t.state.id,
+      title: t.state.title,
+      url: t.state.url,
+      favicon: t.state.favicon,
+      customTitle: t.state.customTitle,
+    }))
   }
 
   getInitialState() {
