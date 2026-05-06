@@ -103,6 +103,19 @@ declare global {
       bookmarkBar: {
         setVisible: (visible: boolean) => Promise<void>
       }
+      platform: string
+      winControls: {
+        minimize: () => void
+        maximize: () => void
+        close: () => void
+        isMaximized: () => Promise<boolean>
+        onMaximizedChange: (cb: (maximized: boolean) => void) => () => void
+      }
+      extensions: {
+        list: () => Promise<Extension[]>
+        install: () => Promise<Extension | null>
+        remove: (id: string) => Promise<void>
+      }
     }
   }
 }
@@ -127,6 +140,14 @@ export interface HistoryEntry {
   title: string
   favicon?: string
   visitedAt: number
+}
+
+export interface Extension {
+  id: string
+  name: string
+  version: string
+  path: string
+  description?: string
 }
 
 export interface Download {

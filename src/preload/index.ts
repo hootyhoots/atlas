@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { TabState, ChatMessage } from '../shared/types'
 
+// Set platform on document synchronously so CSS selectors work before React renders
+document.documentElement.dataset.platform = process.platform
+
 export type TabsStateCallback = (tabs: TabState[], activeId: number | null) => void
 
 function on(channel: string, cb: (...args: unknown[]) => void): () => void {
@@ -141,5 +144,24 @@ contextBridge.exposeInMainWorld('browser', {
 
   bookmarkBar: {
     setVisible: (visible: boolean): Promise<void> => ipcRenderer.invoke('bookmarkBar:setVisible', visible),
+  },
+
+  platform: process.platform,
+
+  winControls: {
+    minimize: (): void => ipcRenderer.send('window:minimize'),
+    maximize: (): void => ipcRenderer.send('window:maximize'),
+    close: (): void => ipcRenderer.send('window:close'),
+    isMaximized: (): Promise<boolean> => ipcRenderer.invoke('window:isMaximized'),
+    onMaximizedChange: (cb: (maximized: boolean) => void): (() => void) =>
+      on('window:maximized', (v) => cb(v as boolean)),
+  },
+
+  extensions: {
+    list: (): Promise<Array<{id: string; name: string; version: string; path: string; description?: string}>> =>
+      ipcRenderer.invoke('extensions:list'),
+    install: (): Promise<{id: string; name: string; version: string; path: string; description?: string} | null> =>
+      ipcRenderer.invoke('extensions:install'),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke('extensions:remove', id),
   },
 })

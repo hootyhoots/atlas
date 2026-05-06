@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import type { TabState } from '../types'
+import WindowControls from './WindowControls'
 
 interface Props {
   tabs: TabState[]
@@ -124,6 +125,7 @@ export default function TabBar({ tabs, activeId, onSwitch, onClose, onNew, onRen
           <path d="M6 1v10M1 6h10"/>
         </svg>
       </button>
+      {window.browser.platform === 'win32' && <WindowControls />}
     </div>
   )
 }

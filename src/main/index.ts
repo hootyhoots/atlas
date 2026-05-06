@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, Menu, net } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { TabManager } from './tabs'
+import { loadAllExtensions, installExtension, getInstalledExtensions, removeExtension } from './extensions'
 import { streamChat } from './ai'
 import { runAgent, stopAgent } from './agent'
 import { loadSettings, getSettings, saveSettings } from './settings'
@@ -282,6 +283,16 @@ function createWindow() {
     }
   })
 
+  // Windows window control IPC
+  if (!isMac) {
+    ipcMain.handle('window:isMaximized', () => win.isMaximized())
+    ipcMain.on('window:minimize', () => win.minimize())
+    ipcMain.on('window:maximize', () => { win.isMaximized() ? win.unmaximize() : win.maximize() })
+    ipcMain.on('window:close', () => win.close())
+    win.on('maximize', () => win.webContents.send('window:maximized', true))
+    win.on('unmaximize', () => win.webContents.send('window:maximized', false))
+  }
+
   const tabs = new TabManager(win)
 
   buildMenu(win, tabs)
@@ -477,6 +488,15 @@ function createWindow() {
   // Bookmark bar visibility
   ipcMain.handle('bookmarkBar:setVisible', (_, visible: boolean) => tabs.setBookmarkBarVisible(visible))
 
+  // Extensions IPC
+  ipcMain.handle('extensions:list', () => getInstalledExtensions())
+  ipcMain.handle('extensions:install', async (event) => {
+    const senderWin = BrowserWindow.fromWebContents(event.sender)
+    if (!senderWin) return null
+    return installExtension(senderWin)
+  })
+  ipcMain.handle('extensions:remove', (_, id: string) => removeExtension(id))
+
   // Setup ad blocker
   win.webContents.session.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
     const settings = getSettings()
@@ -545,11 +565,12 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   loadSettings()
   loadMemories()
   loadBookmarks()
   loadHistory()
+  await loadAllExtensions()
   createWindow()
 
   app.on('activate', () => {
