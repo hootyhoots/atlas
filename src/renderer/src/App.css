@@ -135,10 +135,14 @@ html, body, #root {
   background: var(--bg2);
 }
 
+/* Fallback: covers Mac even if data-platform not yet set by preload */
+@supports (-webkit-app-region: drag) {
+  .tab-bar { padding-left: 82px; }
+}
 /* Mac: leave space for traffic lights */
 html[data-platform="darwin"] .tab-bar { padding-left: 82px; }
 /* Windows: leave space for window controls on the right */
-html[data-platform="win32"] .tab-bar { padding-right: 138px; }
+html[data-platform="win32"] .tab-bar { padding-left: 8px; padding-right: 138px; }
 
 .tabs {
   display: flex;
