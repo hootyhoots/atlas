@@ -177,10 +177,15 @@ export class TabManager {
   switchTo(id: number) {
     this.activeId = id
 
-    for (const [tabId, { view }] of this.tabs) {
+    for (const [tabId, { view, state }] of this.tabs) {
       if (tabId === id) {
-        view.setVisible(true)
-        this.updateBounds(view)
+        if (state.isNewTab) {
+          view.setVisible(false)
+          view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+        } else {
+          view.setVisible(true)
+          this.updateBounds(view)
+        }
       } else {
         view.setVisible(false)
         view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
@@ -199,7 +204,12 @@ export class TabManager {
 
   navigate(url: string) {
     const tab = this.activeTab
-    if (tab) tab.view.webContents.loadURL(url)
+    if (!tab) return
+    tab.state.isNewTab = false
+    tab.view.webContents.loadURL(url)
+    tab.view.setVisible(true)
+    this.updateBounds(tab.view)
+    this.pushState()
   }
 
   back() {
