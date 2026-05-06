@@ -32,7 +32,6 @@ export default function AgentView() {
   const [task, setTask] = useState('')
   const [running, setRunning] = useState(false)
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
-  const [expandedImg, setExpandedImg] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -93,12 +92,6 @@ export default function AgentView() {
 
   return (
     <div className="agent-view">
-      {expandedImg && (
-        <div className="agent-img-overlay" onClick={() => setExpandedImg(null)}>
-          <img src={`data:image/png;base64,${expandedImg}`} alt="Screenshot" />
-        </div>
-      )}
-
       {timeline.length === 0 && !running ? (
         <div className="agent-empty">
           <div className="agent-empty-icon">
@@ -143,15 +136,6 @@ export default function AgentView() {
                     <span className="agent-tool-name">{label}</span>
                     {summary && <span className="agent-tool-summary">{summary}</span>}
                   </div>
-                  {item.imageData && (
-                    <button className="agent-screenshot-btn" onClick={() => setExpandedImg(item.imageData!)}>
-                      <img
-                        className="agent-screenshot-thumb"
-                        src={`data:image/png;base64,${item.imageData}`}
-                        alt="Screenshot"
-                      />
-                    </button>
-                  )}
                   {item.resultText && item.name !== 'screenshot' && (
                     <div className="agent-tool-result">{item.resultText}</div>
                   )}
