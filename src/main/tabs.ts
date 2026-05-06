@@ -57,6 +57,12 @@ export class TabManager {
       }
     })
 
+    // Strip Electron from user agent so sites like Google don't block sign-in
+    const ua = view.webContents.getUserAgent()
+      .replace(/\s*Electron\/\S+/, '')
+      .replace(/\s*AtlasBrowser\/\S+/, '')
+    view.webContents.setUserAgent(ua)
+
     const isNewTab = !url
     const loadUrl = url ?? 'about:blank'
 
