@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } f
 
 export interface AddressBarHandle {
   focus: () => void
+  exitEditing: () => void
 }
 
 interface Props {
@@ -99,7 +100,12 @@ const AddressBar = forwardRef<AddressBarHandle, Props>(function AddressBar(
       setValue(url)
       setEditing(true)
       setTimeout(() => inputRef.current?.select(), 0)
-    }
+    },
+    exitEditing() {
+      setEditing(false)
+      setValue(url)
+      inputRef.current?.blur()
+    },
   }))
 
   const displayed = editing ? value : displayUrl(url)
@@ -157,7 +163,7 @@ const AddressBar = forwardRef<AddressBarHandle, Props>(function AddressBar(
           readOnly={!editing}
           onChange={e => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={() => commit()}
+          onBlur={() => commit(false)}
           spellCheck={false}
         />
       </div>

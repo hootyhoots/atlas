@@ -144,10 +144,10 @@ export default function App() {
               key={s}
               className={`suggestion-item${i === highlightedIdx ? ' suggestion-item--highlighted' : ''}`}
               onMouseDown={e => {
-                // Use mousedown so it fires before input blur
-                e.preventDefault()
+                e.preventDefault() // prevent input blur before we handle the click
                 window.browser.tabs.navigate(s)
                 setSuggestions([])
+                addressBarRef.current?.exitEditing()
               }}
             >
               <svg className="suggestion-icon" width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
