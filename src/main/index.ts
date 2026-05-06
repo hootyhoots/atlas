@@ -3,6 +3,11 @@ import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { TabManager } from './tabs'
 import { loadAllExtensions, installExtension, getInstalledExtensions, removeExtension } from './extensions'
+
+// Allow running as root in CI / container environments (Linux)
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('no-sandbox')
+}
 import { streamChat } from './ai'
 import { runAgent, stopAgent } from './agent'
 import { loadSettings, getSettings, saveSettings } from './settings'
