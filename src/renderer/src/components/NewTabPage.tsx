@@ -38,8 +38,14 @@ export default function NewTabPage({ onNavigate, onFocusAddressBar }: Props) {
           <div className="new-tab-bookmarks">
             <div className="new-tab-bookmarks-label">Bookmarks</div>
             <div className="new-tab-bookmarks-grid">
-              {bookmarks.map(bk => (
-                <button key={bk.id} className="new-tab-bookmark" onClick={() => onNavigate(bk.url)} title={bk.url}>
+              {bookmarks.map((bk, i) => (
+                <button
+                  key={bk.id}
+                  className="new-tab-bookmark"
+                  onClick={() => onNavigate(bk.url)}
+                  title={bk.url}
+                  style={{ '--anim-delay': `${i * 50}ms` } as React.CSSProperties}
+                >
                   {bk.favicon ? (
                     <img src={bk.favicon} alt="" className="new-tab-bookmark__icon" />
                   ) : (
