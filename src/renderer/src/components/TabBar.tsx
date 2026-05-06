@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import type { TabState } from '../types'
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
   onSwitch: (id: number) => void
   onClose: (id: number) => void
   onNew: () => void
+  onRename: (id: number, title: string) => void
 }
 
 function GlobeIcon() {
@@ -17,38 +18,90 @@ function GlobeIcon() {
   )
 }
 
-export default function TabBar({ tabs, activeId, onSwitch, onClose, onNew }: Props) {
+export default function TabBar({ tabs, activeId, onSwitch, onClose, onNew, onRename }: Props) {
+  const [renamingId, setRenamingId] = useState<number | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (renamingId !== null) {
+      renameInputRef.current?.focus()
+      renameInputRef.current?.select()
+    }
+  }, [renamingId])
+
+  function startRename(tab: TabState) {
+    setRenamingId(tab.id)
+    setRenameValue(tab.customTitle ?? tab.title ?? 'New Tab')
+  }
+
+  function commitRename(id: number) {
+    if (renameValue.trim()) {
+      onRename(id, renameValue.trim())
+    }
+    setRenamingId(null)
+  }
+
+  function handleRenameKeyDown(e: React.KeyboardEvent, id: number) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      commitRename(id)
+    } else if (e.key === 'Escape') {
+      setRenamingId(null)
+    }
+  }
+
   return (
     <div className="tab-bar">
       <div className="tabs">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            className={`tab${tab.id === activeId ? ' tab--active' : ''}`}
-            onClick={() => onSwitch(tab.id)}
-            title={tab.title || 'New Tab'}
-          >
-            <span className="tab__icon">
-              {tab.isLoading ? (
-                <span className="tab__spinner" />
-              ) : tab.favicon ? (
-                <img className="tab__favicon" src={tab.favicon} alt="" />
-              ) : (
-                <GlobeIcon />
-              )}
-            </span>
-            <span className="tab__title">{tab.title || 'New Tab'}</span>
+        {tabs.map(tab => {
+          const displayTitle = tab.customTitle ?? tab.title ?? 'New Tab'
+          return (
             <button
-              className="tab__close"
-              onClick={e => { e.stopPropagation(); onClose(tab.id) }}
-              aria-label="Close tab"
+              key={tab.id}
+              className={`tab${tab.id === activeId ? ' tab--active' : ''}`}
+              onClick={() => onSwitch(tab.id)}
+              title={displayTitle}
             >
-              <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-                <path d="M1 1l8 8M9 1 1 9"/>
-              </svg>
+              <span className="tab__icon">
+                {tab.isLoading ? (
+                  <span className="tab__spinner" />
+                ) : tab.favicon ? (
+                  <img className="tab__favicon" src={tab.favicon} alt="" />
+                ) : (
+                  <GlobeIcon />
+                )}
+              </span>
+              {renamingId === tab.id ? (
+                <input
+                  ref={renameInputRef}
+                  className="tab__rename-input"
+                  value={renameValue}
+                  onChange={e => setRenameValue(e.target.value)}
+                  onBlur={() => commitRename(tab.id)}
+                  onKeyDown={e => handleRenameKeyDown(e, tab.id)}
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="tab__title"
+                  onDoubleClick={e => { e.stopPropagation(); startRename(tab) }}
+                >
+                  {displayTitle}
+                </span>
+              )}
+              <button
+                className="tab__close"
+                onClick={e => { e.stopPropagation(); onClose(tab.id) }}
+                aria-label="Close tab"
+              >
+                <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                  <path d="M1 1l8 8M9 1 1 9"/>
+                </svg>
+              </button>
             </button>
-          </button>
-        ))}
+          )
+        })}
       </div>
       <button className="new-tab-btn" onClick={onNew} aria-label="New tab" title="New tab">
         <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">

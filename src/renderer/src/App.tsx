@@ -3,11 +3,13 @@ import TabBar from './components/TabBar'
 import AddressBar, { type AddressBarHandle } from './components/AddressBar'
 import Sidebar from './components/Sidebar'
 import FindBar from './components/FindBar'
+import TabSearch from './components/TabSearch'
 import type { TabState } from './types'
 
 const SIDEBAR_WIDTH = 360
 const FIND_BAR_HEIGHT = 46
 const SUGGESTION_ITEM_HEIGHT = 40
+const TAB_SEARCH_HEIGHT = 320
 
 export default function App() {
   const [tabs, setTabs] = useState<TabState[]>([])
@@ -17,6 +19,7 @@ export default function App() {
   const [highlightedIdx, setHighlightedIdx] = useState(-1)
   const [findOpen, setFindOpen] = useState(false)
   const [findResult, setFindResult] = useState<{ active: number; total: number } | null>(null)
+  const [tabSearchOpen, setTabSearchOpen] = useState(false)
   const addressBarRef = useRef<AddressBarHandle>(null)
 
   // Keep browser and find state in refs to avoid stale closures
@@ -56,9 +59,16 @@ export default function App() {
     return window.browser.find.onResult(r => setFindResult(r))
   }, [])
 
+  // Tab search toggle from menu (Cmd+Shift+A)
+  useEffect(() => {
+    return window.browser.tabs.onSearchToggle(() => setTabSearchOpen(t => !t))
+  }, [])
+
   // extraTop: space between chrome and webContentsView for panels
   const extraTop = findOpen
     ? FIND_BAR_HEIGHT
+    : tabSearchOpen
+    ? TAB_SEARCH_HEIGHT
     : suggestions.length > 0
     ? suggestions.length * SUGGESTION_ITEM_HEIGHT
     : 0
@@ -110,6 +120,16 @@ export default function App() {
 
   const active = tabs.find(t => t.id === activeId)
 
+  function handleToggleAiVisible() {
+    if (activeId == null) return
+    const current = active?.aiVisible ?? true
+    window.browser.tabs.setAiVisible(activeId, !current)
+  }
+
+  function handleRename(id: number, title: string) {
+    window.browser.tabs.rename(id, title)
+  }
+
   return (
     <div className="app">
       <div className="chrome">
@@ -119,6 +139,7 @@ export default function App() {
           onSwitch={id => window.browser.tabs.switch(id)}
           onClose={id => window.browser.tabs.close(id)}
           onNew={() => window.browser.tabs.create()}
+          onRename={handleRename}
         />
         <AddressBar
           ref={addressBarRef}
@@ -133,11 +154,13 @@ export default function App() {
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(o => !o)}
           onQueryChange={stableQueryChange}
+          aiVisible={active?.aiVisible ?? true}
+          onToggleAiVisible={handleToggleAiVisible}
         />
       </div>
 
       {/* Panels that sit between chrome and web content */}
-      {suggestions.length > 0 && !findOpen && (
+      {suggestions.length > 0 && !findOpen && !tabSearchOpen && (
         <div className="suggestions-panel">
           {suggestions.map((s, i) => (
             <button
@@ -161,6 +184,14 @@ export default function App() {
 
       {findOpen && (
         <FindBar result={findResult} onClose={closeFindBar} />
+      )}
+
+      {tabSearchOpen && (
+        <TabSearch
+          tabs={tabs}
+          onSwitch={id => { window.browser.tabs.switch(id); setTabSearchOpen(false) }}
+          onClose={() => setTabSearchOpen(false)}
+        />
       )}
 
       <div className="content-area">
