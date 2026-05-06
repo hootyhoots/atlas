@@ -1,4 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
+
+export interface AddressBarHandle {
+  focus: () => void
+}
 
 interface Props {
   url: string
@@ -11,6 +15,7 @@ interface Props {
   onReload: () => void
   sidebarOpen: boolean
   onToggleSidebar: () => void
+  onQueryChange: (text: string, isEditing: boolean) => void
 }
 
 function displayUrl(url: string): string {
@@ -20,10 +25,6 @@ function displayUrl(url: string): string {
   } catch {
     return url
   }
-}
-
-function isSecureUrl(url: string): boolean {
-  return url.startsWith('https://')
 }
 
 function BackIcon() {
@@ -75,30 +76,31 @@ function GlobeIcon() {
   )
 }
 
-function SparkleIcon({ active }: { active: boolean }) {
+function SparkleIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M7.657 6.247c.11-.33.576-.33.686 0l.645 1.937a2.89 2.89 0 0 0 1.829 1.828l1.936.645c.33.11.33.576 0 .686l-1.937.645a2.89 2.89 0 0 0-1.828 1.829l-.645 1.936a.361.361 0 0 1-.686 0l-.645-1.937a2.89 2.89 0 0 0-1.828-1.828l-1.937-.645a.361.361 0 0 1 0-.686l1.937-.645a2.89 2.89 0 0 0 1.828-1.828zM3.794 1.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387A1.73 1.73 0 0 0 4.593 5.69l-.387 1.162a.217.217 0 0 1-.412 0L3.407 5.69A1.73 1.73 0 0 0 2.31 4.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387A1.73 1.73 0 0 0 3.407 2.31zM10.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.16 1.16 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.16 1.16 0 0 0-.732-.732L9.1 2.137a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732z" />
+      <path d="M7.657 6.247c.11-.33.576-.33.686 0l.645 1.937a2.89 2.89 0 0 0 1.829 1.828l1.936.645c.33.11.33.576 0 .686l-1.937.645a2.89 2.89 0 0 0-1.828 1.829l-.645 1.936a.361.361 0 0 1-.686 0l-.645-1.937a2.89 2.89 0 0 0-1.828-1.828l-1.937-.645a.361.361 0 0 1 0-.686l1.937-.645a2.89 2.89 0 0 0 1.828-1.828zM3.794 1.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387A1.73 1.73 0 0 0 4.593 5.69l-.387 1.162a.217.217 0 0 1-.412 0L3.407 5.69A1.73 1.73 0 0 0 2.31 4.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387A1.73 1.73 0 0 0 3.407 2.31zM10.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.16 1.16 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.16 1.16 0 0 0-.732-.732L9.1 2.137a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732z"/>
     </svg>
   )
 }
 
-export default function AddressBar({
-  url,
-  isLoading,
-  canGoBack,
-  canGoForward,
-  onNavigate,
-  onBack,
-  onForward,
-  onReload,
-  sidebarOpen,
-  onToggleSidebar,
-}: Props) {
+const AddressBar = forwardRef<AddressBarHandle, Props>(function AddressBar(
+  { url, isLoading, canGoBack, canGoForward, onNavigate, onBack, onForward, onReload,
+    sidebarOpen, onToggleSidebar, onQueryChange },
+  ref
+) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-  const secure = isSecureUrl(url)
+  const secure = url.startsWith('https://')
+
+  useImperativeHandle(ref, () => ({
+    focus() {
+      setValue(url)
+      setEditing(true)
+      setTimeout(() => inputRef.current?.select(), 0)
+    }
+  }))
 
   const displayed = editing ? value : displayUrl(url)
 
@@ -108,19 +110,25 @@ export default function AddressBar({
     setTimeout(() => inputRef.current?.select(), 0)
   }
 
-  function commit() {
+  function commit(nav = true) {
     setEditing(false)
-    if (value.trim()) onNavigate(value.trim())
+    onQueryChange('', false)
+    if (nav && value.trim()) onNavigate(value.trim())
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter') commit()
-    if (e.key === 'Escape') setEditing(false)
+    if (e.key === 'Escape') commit(false)
+    // ArrowUp/Down are handled by App.tsx via document keydown
   }
 
   useEffect(() => {
     if (!editing) setValue(url)
   }, [url, editing])
+
+  useEffect(() => {
+    onQueryChange(editing ? value : '', editing)
+  }, [value, editing])
 
   return (
     <div className="toolbar">
@@ -149,7 +157,7 @@ export default function AddressBar({
           readOnly={!editing}
           onChange={e => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={commit}
+          onBlur={() => commit()}
           spellCheck={false}
         />
       </div>
@@ -160,8 +168,10 @@ export default function AddressBar({
         aria-label="Toggle AI sidebar"
         title="Atlas AI"
       >
-        <SparkleIcon active={sidebarOpen} />
+        <SparkleIcon />
       </button>
     </div>
   )
-}
+})
+
+export default AddressBar

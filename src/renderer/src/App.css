@@ -346,6 +346,154 @@ html, body, #root {
 }
 
 /* ─────────────────────────────────────────────────
+   SUGGESTIONS PANEL
+───────────────────────────────────────────────── */
+.suggestions-panel {
+  flex-shrink: 0;
+  background: #1a1a1d;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  flex-direction: column;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 16px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+  border-left: 2px solid transparent;
+}
+
+.suggestion-item:hover,
+.suggestion-item--highlighted {
+  background: rgba(255,255,255,0.05);
+  border-left-color: var(--accent);
+}
+
+.suggestion-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.suggestion-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────────────
+   FIND BAR
+───────────────────────────────────────────────── */
+.find-bar {
+  flex-shrink: 0;
+  height: 46px;
+  background: #1a1a1d;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+}
+
+.find-bar__inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 500px;
+}
+
+.find-bar__input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 30px;
+  gap: 8px;
+  transition: border-color 0.15s;
+}
+
+.find-bar__input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(10,132,255,0.12);
+}
+
+.find-bar__input-wrap--no-results {
+  border-color: #ff453a;
+  box-shadow: 0 0 0 2px rgba(255,69,58,0.12);
+}
+
+.find-bar__input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 0;
+}
+
+.find-bar__input::placeholder {
+  color: rgba(255,255,255,0.2);
+}
+
+.find-bar__count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.find-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.find-bar__btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+
+.find-bar__btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.find-bar__btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.find-bar__sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ─────────────────────────────────────────────────
    SIDEBAR
 ───────────────────────────────────────────────── */
 .sidebar {

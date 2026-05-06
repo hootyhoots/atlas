@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Menu, net } from 'electron'
 import { join } from 'path'
 import { TabManager } from './tabs'
 import { streamChat } from './ai'
@@ -14,6 +14,128 @@ function normalizeUrl(input: string): string {
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`
 }
 
+function buildMenu(win: BrowserWindow, tabs: TabManager) {
+  const isMac = process.platform === 'darwin'
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac ? [{
+      label: app.getName(),
+      submenu: [
+        { role: 'about' as const },
+        { type: 'separator' as const },
+        { role: 'services' as const },
+        { type: 'separator' as const },
+        { role: 'hide' as const },
+        { role: 'hideOthers' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const },
+      ],
+    }] : []),
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New Tab',
+          accelerator: 'CmdOrCtrl+T',
+          click: () => tabs.create(),
+        },
+        {
+          label: 'Close Tab',
+          accelerator: 'CmdOrCtrl+W',
+          click: () => { if (tabs.activeTabId != null) tabs.close(tabs.activeTabId) },
+        },
+        { type: 'separator' },
+        isMac ? { role: 'close' as const } : { role: 'quit' as const },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' as const },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const },
+        { role: 'selectAll' as const },
+        { type: 'separator' as const },
+        {
+          label: 'Find in Page',
+          accelerator: 'CmdOrCtrl+F',
+          click: () => win.webContents.send('find:toggle'),
+        },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Reload Page',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => tabs.reload(),
+        },
+        {
+          label: 'Focus Address Bar',
+          accelerator: 'CmdOrCtrl+L',
+          click: () => win.webContents.send('browser:focus-address-bar'),
+        },
+        { type: 'separator' },
+        {
+          label: 'Zoom In',
+          accelerator: 'CmdOrCtrl+=',
+          click: () => tabs.zoomIn(),
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CmdOrCtrl+-',
+          click: () => tabs.zoomOut(),
+        },
+        {
+          label: 'Reset Zoom',
+          accelerator: 'CmdOrCtrl+0',
+          click: () => tabs.resetZoom(),
+        },
+        { type: 'separator' },
+        { role: 'toggleDevTools' as const },
+      ],
+    },
+    {
+      label: 'History',
+      submenu: [
+        {
+          label: 'Back',
+          accelerator: isMac ? 'Cmd+[' : 'Alt+Left',
+          click: () => tabs.back(),
+        },
+        {
+          label: 'Forward',
+          accelerator: isMac ? 'Cmd+]' : 'Alt+Right',
+          click: () => tabs.forward(),
+        },
+      ],
+    },
+    {
+      label: 'Tab',
+      submenu: [
+        {
+          label: 'Previous Tab',
+          accelerator: isMac ? 'Cmd+Shift+[' : 'Ctrl+Shift+Tab',
+          click: () => tabs.switchRelative(-1),
+        },
+        {
+          label: 'Next Tab',
+          accelerator: isMac ? 'Cmd+Shift+]' : 'Ctrl+Tab',
+          click: () => tabs.switchRelative(1),
+        },
+      ],
+    },
+  ]
+
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+  if (!isMac) win.setMenuBarVisibility(false)
+}
+
 function createWindow() {
   const isMac = process.platform === 'darwin'
 
@@ -24,7 +146,7 @@ function createWindow() {
     minHeight: 400,
     titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
     ...(isMac && { trafficLightPosition: { x: 16, y: 20 } }),
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#161618',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -34,6 +156,8 @@ function createWindow() {
   })
 
   const tabs = new TabManager(win)
+
+  buildMenu(win, tabs)
 
   ipcMain.handle('browser:ready', () => {
     tabs.setRendererReady()
@@ -49,6 +173,26 @@ function createWindow() {
   ipcMain.handle('tabs:reload', () => tabs.reload())
 
   ipcMain.handle('sidebar:setWidth', (_, width: number) => tabs.setSidebarWidth(width))
+  ipcMain.handle('view:setExtraTop', (_, height: number) => tabs.setExtraTop(height))
+
+  ipcMain.handle('view:zoom-in', () => tabs.zoomIn())
+  ipcMain.handle('view:zoom-out', () => tabs.zoomOut())
+  ipcMain.handle('view:zoom-reset', () => tabs.resetZoom())
+
+  ipcMain.handle('find:search', (_, text: string, forward: boolean) => tabs.findInPage(text, forward))
+  ipcMain.handle('find:stop', () => tabs.stopFindInPage())
+
+  ipcMain.handle('suggest:query', async (_, query: string) => {
+    if (!query.trim()) return []
+    try {
+      const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(query)}`
+      const resp = await net.fetch(url)
+      const data = await resp.json() as [string, string[]]
+      return (data[1] ?? []).slice(0, 6)
+    } catch {
+      return []
+    }
+  })
 
   ipcMain.handle('settings:get', () => ({
     ...getSettings(),
@@ -64,9 +208,7 @@ function createWindow() {
       if (wc) {
         try {
           pageContent = await wc.executeJavaScript('document.body.innerText.slice(0, 10000)')
-        } catch {
-          // page may not support JS execution
-        }
+        } catch {}
       }
     }
     const { apiKey } = getSettings()

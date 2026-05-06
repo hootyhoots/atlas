@@ -2,7 +2,7 @@ import { WebContentsView, BrowserWindow } from 'electron'
 import type { TabState } from '../shared/types'
 
 export type { TabState }
-export const CHROME_HEIGHT = 80
+export const CHROME_HEIGHT = 82
 
 interface Tab {
   view: WebContentsView
@@ -16,9 +16,14 @@ export class TabManager {
   private win: BrowserWindow
   private rendererReady = false
   private sidebarWidth = 0
+  private extraTop = 0
 
   constructor(win: BrowserWindow) {
     this.win = win
+  }
+
+  get activeTabId(): number | null {
+    return this.activeId
   }
 
   setRendererReady() {
@@ -87,6 +92,13 @@ export class TabManager {
       this.pushState()
     })
 
+    wc.on('found-in-page', (_, result) => {
+      this.win.webContents.send('find:result', {
+        active: result.activeMatchOrdinal,
+        total: result.matches,
+      })
+    })
+
     view.setVisible(false)
     wc.loadURL(url)
     this.switchTo(id)
@@ -130,6 +142,13 @@ export class TabManager {
     this.pushState()
   }
 
+  switchRelative(delta: number) {
+    const ids = [...this.tabs.keys()]
+    const idx = ids.indexOf(this.activeId ?? -1)
+    if (idx === -1 || ids.length < 2) return
+    this.switchTo(ids[(idx + delta + ids.length) % ids.length])
+  }
+
   navigate(url: string) {
     const tab = this.activeTab
     if (tab) tab.view.webContents.loadURL(url)
@@ -149,6 +168,29 @@ export class TabManager {
     this.activeTab?.view.webContents.reload()
   }
 
+  zoomIn() {
+    const wc = this.activeTab?.view.webContents
+    if (wc) wc.setZoomLevel(Math.min(wc.getZoomLevel() + 0.5, 5))
+  }
+
+  zoomOut() {
+    const wc = this.activeTab?.view.webContents
+    if (wc) wc.setZoomLevel(Math.max(wc.getZoomLevel() - 0.5, -5))
+  }
+
+  resetZoom() {
+    this.activeTab?.view.webContents.setZoomLevel(0)
+  }
+
+  findInPage(text: string, forward = true) {
+    const wc = this.activeTab?.view.webContents
+    if (wc && text) wc.findInPage(text, { forward, findNext: true })
+  }
+
+  stopFindInPage() {
+    this.activeTab?.view.webContents.stopFindInPage('clearSelection')
+  }
+
   updateActiveBounds() {
     const tab = this.activeTab
     if (tab) this.updateBounds(tab.view)
@@ -156,6 +198,11 @@ export class TabManager {
 
   setSidebarWidth(width: number) {
     this.sidebarWidth = width
+    this.updateActiveBounds()
+  }
+
+  setExtraTop(height: number) {
+    this.extraTop = height
     this.updateActiveBounds()
   }
 
@@ -169,11 +216,12 @@ export class TabManager {
 
   private updateBounds(view: WebContentsView) {
     const { width, height } = this.win.getContentBounds()
+    const top = CHROME_HEIGHT + this.extraTop
     view.setBounds({
       x: 0,
-      y: CHROME_HEIGHT,
+      y: top,
       width: Math.max(0, width - this.sidebarWidth),
-      height: Math.max(0, height - CHROME_HEIGHT),
+      height: Math.max(0, height - top),
     })
   }
 

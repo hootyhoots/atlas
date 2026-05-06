@@ -13,10 +13,24 @@ declare global {
         back: () => Promise<void>
         forward: () => Promise<void>
         reload: () => Promise<void>
-        onStateChange: (
-          cb: (tabs: TabState[], activeId: number | null) => void
-        ) => () => void
+        onStateChange: (cb: (tabs: TabState[], activeId: number | null) => void) => () => void
       }
+      view: {
+        setExtraTop: (height: number) => Promise<void>
+        zoomIn: () => Promise<void>
+        zoomOut: () => Promise<void>
+        zoomReset: () => Promise<void>
+      }
+      find: {
+        search: (text: string, forward: boolean) => Promise<void>
+        stop: () => Promise<void>
+        onResult: (cb: (result: { active: number; total: number }) => void) => () => void
+      }
+      suggest: {
+        query: (text: string) => Promise<string[]>
+      }
+      onFocusAddressBar: (cb: () => void) => () => void
+      onFindToggle: (cb: () => void) => () => void
       ai: {
         chat: (messages: ChatMessage[], includePageContent: boolean) => Promise<void>
         onChunk: (cb: (text: string) => void) => () => void
